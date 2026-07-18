@@ -55,18 +55,25 @@ def slug_autor(nome: str) -> str:
 
 
 def monta_url(nome: str, pagina: int = 1) -> str:
-    """Monta a URL de busca com todos os filtros validados."""
+    """
+    Monta a URL de busca.
+
+    DESCOBERTA IMPORTANTE (18/07/2026): o campo correto para buscar por autor
+    é searchField=autor (não "titulo-autor" com um parâmetro extra "&autor=").
+    Usar searchField=autor sozinho já filtra certinho pelos livros do autor,
+    sem precisar de mais nada — e sem o problema de zerar resultados para
+    autores menos populares que não tinham o campo "autor" (do outro modo)
+    marcado no anúncio.
+    """
     q = quote(nome)
-    a = slug_autor(nome)
     preco_min = config.PRECO_MIN_REAIS * 100      # site usa centavos
     preco_max = config.PRECO_MAX_REAIS * 100
     url = (
         f"https://www.estantevirtual.com.br/busca"
         f"?q={q}"
-        f"&searchField=titulo-autor"
+        f"&searchField=autor"
         f"&sort={config.ORDENACAO}"
         f"&_preco={preco_min}-{preco_max}"
-        f"&autor={a}"
     )
     if config.TIPO_LIVRO:
         url += f"&tipo-de-livro={config.TIPO_LIVRO}"
@@ -337,8 +344,10 @@ def main():
                 itens = le_resultados_da_pagina(page)
                 total_lidos += len(itens)
 
-                # DIAGNÓSTICO: se não achou nada, salva print + HTML da página
-                # para conseguirmos ver depois o que o robô realmente recebeu.
+                # DIAGNÓSTICO: se mesmo com o fallback não achou nada, salva
+                # print + HTML da página para conseguirmos ver depois o que
+                # o robô realmente recebeu (pode ser genuinamente sem estoque,
+                # ou pode ser algum bloqueio/erro que ainda não identificamos).
                 if len(itens) == 0:
                     try:
                         base = f"{pasta_debug}/{idx:02d}_{chave_autor}_p{pagina}"
