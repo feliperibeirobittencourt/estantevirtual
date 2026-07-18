@@ -1,10 +1,19 @@
 name: Monitor Estante Virtual
 
+# Quando rodar:
+# 1) Sozinho, todo dia às 9h (horário de Brasília) — ajuste o "cron" se quiser outro horário.
+# 2) A qualquer momento, manualmente, clicando em "Run workflow" na aba Actions do GitHub.
 on:
   schedule:
-    - cron: '0 12 * * *'
-  workflow_dispatch: {}
+    - cron: '0 12 * * *'   # 12:00 UTC = 09:00 em Brasília (horário padrão, sem horário de verão)
+  workflow_dispatch:
+    inputs:
+      limite:
+        description: 'Quantos autores testar (deixe 81 para rodar tudo; use 3 para teste rápido)'
+        required: false
+        default: '3'
 
+# Permissão para o robô salvar os resultados de volta no seu repositório
 permissions:
   contents: write
 
@@ -27,7 +36,17 @@ jobs:
           playwright install --with-deps chromium
 
       - name: Rodar a checagem no Estante Virtual
+        env:
+          LIMITE_AUTORES: ${{ inputs.limite || '81' }}
         run: python monitor.py
+
+      - name: Guardar prints de diagnóstico (para eu poder ver o que a página mostrou)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostico
+          path: debug/
+          if-no-files-found: ignore
 
       - name: Salvar o histórico e a planilha de volta no repositório
         run: |
