@@ -115,7 +115,7 @@ def le_resultados_da_pagina(page):
 
     # espera os cartões carregarem (o site é JS; precisa aguardar render)
     try:
-        page.wait_for_selector("a[href*='/livros/']", timeout=15000)
+        page.wait_for_selector("a[href*='/livros/']", timeout=8000)
     except Exception:
         return resultados  # nenhuma correspondência ou página vazia
 
@@ -296,6 +296,16 @@ def main():
     novidades = []
     total_lidos = 0
 
+    # Permite testar com poucos autores (via variável de ambiente LIMITE_AUTORES),
+    # em vez de rodar os 81 de uma vez enquanto ainda estamos ajustando o script.
+    limite = int(os.environ.get("LIMITE_AUTORES", str(len(TODOS))))
+    lista_autores = TODOS[:limite]
+    if limite < len(TODOS):
+        print(f"[modo teste] rodando só os primeiros {limite} de {len(TODOS)} autores")
+
+    pasta_debug = "debug"
+    os.makedirs(pasta_debug, exist_ok=True)
+
     with sync_playwright() as p:
         # No Mac (headless=False) você vê a janela do navegador trabalhando.
         # No GitHub Actions não existe tela, então detectamos automaticamente
@@ -310,8 +320,8 @@ def main():
         )
         page = contexto.new_page()
 
-        for idx, (nome, grupo) in enumerate(TODOS, start=1):
-            print(f"[{idx:02d}/{len(TODOS)}] {nome} ({grupo})...", end=" ", flush=True)
+        for idx, (nome, grupo) in enumerate(lista_autores, start=1):
+            print(f"[{idx:02d}/{len(lista_autores)}] {nome} ({grupo})...", end=" ", flush=True)
             chave_autor = slug_autor(nome)
             vistos_antes = set(historico.get(chave_autor, []))
             novos_deste_autor = []
@@ -326,6 +336,17 @@ def main():
 
                 itens = le_resultados_da_pagina(page)
                 total_lidos += len(itens)
+
+                # DIAGNÓSTICO: se não achou nada, salva print + HTML da página
+                # para conseguirmos ver depois o que o robô realmente recebeu.
+                if len(itens) == 0:
+                    try:
+                        base = f"{pasta_debug}/{idx:02d}_{chave_autor}_p{pagina}"
+                        page.screenshot(path=f"{base}.png", full_page=True)
+                        with open(f"{base}.html", "w", encoding="utf-8") as f:
+                            f.write(page.content())
+                    except Exception as e:
+                        print(f"(falha ao salvar diagnóstico: {e})", end=" ")
 
                 for item in itens:
                     # identificador único do anúncio = link
